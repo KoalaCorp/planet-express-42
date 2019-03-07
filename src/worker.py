@@ -2,6 +2,8 @@
 import argparse
 import pika
 
+from cleaner import Tokenized
+
 
 class Connector(object):
     def __init__(self, queue):
@@ -13,7 +15,7 @@ class Connector(object):
 
     def start_connector(self):
         def callback(ch, method, properties, body):
-            print(body)
+            tokenized = Tokenized(body)
             ch.basic_ack(delivery_tag=method.delivery_tag)
         self.channel.basic_qos(prefetch_count=1)
         self.channel.basic_consume(callback, queue=self.queue)
