@@ -3,13 +3,14 @@ import argparse
 import pika
 
 from cleaner import Tokenized
-
+from settings import RABBITMQ_HOST, RABBITMQ_PORT
 
 class Connector(object):
     def __init__(self, queue):
         self.queue = queue
         self.connection = pika.BlockingConnection(
-            pika.ConnectionParameters(host='localhost'))
+            pika.ConnectionParameters(host=RABBITMQ_HOST,
+                                      port=RABBITMQ_PORT))
         self.channel = self.connection.channel()
         self.channel.queue_declare(queue=queue, durable=True)
 
