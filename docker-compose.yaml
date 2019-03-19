@@ -1,6 +1,10 @@
 ---
 version: '0.1'
 services:
+  rabbitmq:
+    image: rabbitmq
+    ports:
+      - "5672:5672"
   redis:
     image: redis
     ports:
