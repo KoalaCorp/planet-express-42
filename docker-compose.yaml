@@ -1,10 +1,13 @@
 version: '3'
 services:
-  planet-express-42:
-    image: koalacorp/planet-express-42:0.0.1
+  mongo:
+    image: mongo
+    container_name: mongo
+    hostname: mongo
+    ports:
+      - "27017:27017"
     networks:
       - planet-express_planet-express-network
-
 networks:
   planet-express_planet-express-network:
     external: true
