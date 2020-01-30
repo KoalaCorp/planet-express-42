@@ -50,12 +50,15 @@ class Connector(object):
     def start_connector(self):
         def callback(ch, method, properties, body):
             self.logger.info("Tokenizing")
-            tokenized = Tokenized(body)
-            self.logger.info("inserting in mongo")
-            db = self.__mongo_connection__()
-            db.insert_collection("default", json.loads(body.decode('utf8')))
-            ch.basic_ack(delivery_tag=method.delivery_tag)
-            self.logger.info(body)
+            body_json = json.loads(body.decode('utf8'))
+            if 'content' in body_json.keys():
+                tokenized = Tokenized(body_json['content'])
+                body_json['tokenized'] = tokenized.clean_text()
+                self.logger.info("inserting in mongo")
+                db = self.__mongo_connection__()
+                db.insert_collection("default", body_json)
+                ch.basic_ack(delivery_tag=method.delivery_tag)
+                self.logger.info(body)
         self.logger.info('Starting Connector')
         self.channel.basic_qos(prefetch_count=1)
         self.channel.basic_consume(callback, queue=self.queue)
