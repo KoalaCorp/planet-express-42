@@ -2,18 +2,14 @@
 import argparse
 import logging
 import json
-import pika
+from time import sleep
 
+from async_consumer import Consumer
 from cleaner import Tokenized
 from mongo import Mongo
 from settings import (
-        RABBITMQ_HOST, RABBITMQ_PORT, MONGO_HOST,
-        MONGO_PORT, MONGO_DATABASE)
-
-
-# create logger
-logger = logging.getLogger('main_logger')
-logger.setLevel(logging.DEBUG)
+        RABBITMQ_HOST, RABBITMQ_PORT, RABBITMQ_USER, RABBITMQ_PASSWORD,
+        MONGO_HOST, MONGO_PORT, MONGO_DATABASE)
 
 
 logger = logging.getLogger(__name__)
@@ -25,15 +21,14 @@ class Connector(object):
         self.logger = logger
         self.logger.info("Connecting to rabbitmq: {}:{}".format(RABBITMQ_HOST,
                                                                 RABBITMQ_PORT))
-        self.queue = queue
-        credentials = pika.PlainCredentials('guest', 'guest')
-        self.connection = pika.BlockingConnection(
-            pika.ConnectionParameters(RABBITMQ_HOST,
-                                      RABBITMQ_PORT,
-                                      '/',
-                                      credentials))
-        self.channel = self.connection.channel()
-        self.channel.queue_declare(queue=queue, durable=True)
+        self._reconnect_delay = 0
+        self._amqp_url = 'amqp://{}:{}@localhost:5672/'.format(
+            RABBITMQ_USER,
+            RABBITMQ_PASSWORD,
+            RABBITMQ_HOST,
+            RABBITMQ_PORT
+        )
+        self._consumer = Consumer(self._amqp_url, queue, self._callback)
         self.logger.info("Connected to rabbitmq: {}:{}".format(RABBITMQ_HOST,
                                                                RABBITMQ_PORT))
 
@@ -47,27 +42,48 @@ class Connector(object):
                                                             MONGO_PORT))
         return db
 
-    def start_connector(self):
-        def callback(ch, method, properties, body):
-            self.logger.info("Tokenizing")
-            body_json = json.loads(body.decode('utf8'))
-            if 'content' in body_json.keys():
-                tokenized = Tokenized(body_json['content'])
-                body_json['tokenized'] = tokenized.clean_text()
-                self.logger.info("inserting in mongo")
-                db = self.__mongo_connection__()
-                db.insert_collection("default", body_json)
-                ch.basic_ack(delivery_tag=method.delivery_tag)
-                self.logger.info(body)
-        self.logger.info('Starting Connector')
-        self.channel.basic_qos(prefetch_count=1)
-        self.channel.basic_consume(callback, queue=self.queue)
-        self.channel.start_consuming()
+    def run(self):
+        while True:
+            try:
+                self._consumer.run()
+            except KeyboardInterrupt:
+                self._consumer.stop()
+                break
+            self._maybe_reconnect()
+
+    def _maybe_reconnect(self):
+        if self._consumer.should_reconnect:
+            self._consumer.stop()
+            reconnect_delay = self._get_reconnect_delay()
+            self.logger.info('Reconnecting after %d seconds', reconnect_delay)
+            sleep(reconnect_delay)
+            self._consumer = Consumer(self._amqp_url)
+
+    def _get_reconnect_delay(self):
+        if self._consumer.was_consuming:
+            self._reconnect_delay = 0
+        else:
+            self._reconnect_delay += 1
+        if self._reconnect_delay > 30:
+            self._reconnect_delay = 30
+        return self._reconnect_delay
+
+    def _callback(self, body):
+        self.logger.info("Tokenizing")
+        body_json = json.loads(body.decode('utf8'))
+        self.logger.info(body_json.keys())
+        if 'content' in body_json.keys():
+            tokenized = Tokenized(body_json['content'])
+            body_json['tokenized'] = tokenized.clean_text()
+            self.logger.info("inserting in mongo")
+            db = self.__mongo_connection__()
+            db.insert_collection("default", body_json)
+            self.logger.info(body)
 
 
 def init_worker(queue):
-    connector = Connector(queue)
-    connector.start_connector()
+    consumer = Connector(queue)
+    consumer.run()
 
 
 if __name__ == '__main__':
