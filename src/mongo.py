@@ -8,4 +8,4 @@ class Mongo(object):
 
     def insert_collection(self, collection, data):
         collection = self.database[collection]
-        collection.insert_one(data)
+        collection.update({"url": data["url"]}, data, upsert=True)
