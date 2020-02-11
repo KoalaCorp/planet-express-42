@@ -4,6 +4,8 @@ from nltk import data
 from nltk import FreqDist
 from nltk.tokenize import word_tokenize
 
+from settings import TOP_WORDS
+
 
 LANGUAGE = 'es'
 NORMS = [
@@ -26,4 +28,5 @@ class Tokenized(object):
         flatList = [word for sentList in espTokens for word in sentList]
         espFreq = FreqDist(word for word in flatList)
 
-        return espFreq.most_common()[:5]
+        return [{"word": word[0], "score":word[1]}
+                for word in espFreq.most_common()[:TOP_WORDS]]
