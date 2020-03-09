@@ -2,6 +2,7 @@
 import argparse
 import logging
 import json
+import subprocess
 from time import sleep
 
 from async_consumer import Consumer
@@ -17,8 +18,14 @@ logging.basicConfig(level=logging.INFO)
 
 
 class Connector(object):
-    def __init__(self, queue):
+    __callback_dicts__ = {
+        'text': '_callback_text',
+        'pdf': '_callback_pdf'
+    }
+
+    def __init__(self, queue, text_type, pdf_separator):
         self.logger = logger
+        self.pdf_separator = pdf_separator
         self.logger.info("Connecting to rabbitmq: {}:{}".format(RABBITMQ_HOST,
                                                                 RABBITMQ_PORT))
         self._reconnect_delay = 0
@@ -28,19 +35,20 @@ class Connector(object):
             RABBITMQ_HOST,
             RABBITMQ_PORT
         )
-        self._consumer = Consumer(self._amqp_url, queue, self._callback)
+        self._consumer = Consumer(self._amqp_url,
+                                  queue,
+                                  getattr(self,
+                                          self.__callback_dicts__[text_type]))
         self.logger.info("Connected to rabbitmq: {}:{}".format(RABBITMQ_HOST,
                                                                RABBITMQ_PORT))
-
-    def __mongo_connection__(self):
         db = Mongo(
                     MONGO_DATABASE,
                     MONGO_HOST,
                     MONGO_PORT
                 )
+        self.db = db
         self.logger.info("Connected to mongo: {}:{}".format(MONGO_HOST,
                                                             MONGO_PORT))
-        return db
 
     def run(self):
         while True:
@@ -68,7 +76,7 @@ class Connector(object):
             self._reconnect_delay = 30
         return self._reconnect_delay
 
-    def _callback(self, body):
+    def _callback_text(self, body):
         self.logger.info("Tokenizing")
         body_json = json.loads(body.decode('utf8'))
         self.logger.info(body_json.keys())
@@ -76,18 +84,40 @@ class Connector(object):
             tokenized = Tokenized(body_json['content'])
             body_json['tokenized'] = tokenized.clean_text()
             self.logger.info("inserting in mongo")
-            db = self.__mongo_connection__()
-            db.insert_collection("default", body_json)
+            self.db.insert_collection("default", body_json)
+            self.logger.info(body)
+
+    def _callback_pdf(self, body):
+        self.logger.info("Tokenizing")
+        body_json = json.loads(body.decode('utf8'))
+        self.logger.info(body_json.keys())
+        if 'file_path' in body_json.keys():
+            content = subprocess.run(['pdftotext', body_json['file_path'], '-'],
+                                     stdout=subprocess.PIPE)
+            body_json['content'] = str(content.stdout, 'utf-8')\
+                .replace('\n ', '').replace('\n', ' ')
+
+            text = body_json['content'].split(self.pdf_separator)
+            body_json['tokenized'] = []
+            for paragraph in text:
+                tokenized = Tokenized(paragraph)
+                body_json['tokenized'].append(tokenized.clean_text())
+            self.logger.info("inserting in mongo")
+            self.db.insert_collection("pdfs", body_json)
             self.logger.info(body)
 
 
-def init_worker(queue):
-    consumer = Connector(queue)
+def init_worker(queue, text_type, pdf_separator):
+    consumer = Connector(queue, text_type, pdf_separator)
     consumer.run()
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Init worker')
     parser.add_argument('queue', help='Queue to read messages')
+    parser.add_argument('--text-type', help='Type of text to tokenize',
+                        default='text')
+    parser.add_argument('--pdf_separator', help='PDF paragraph text separator',
+                        default='  \x0c')
     args = parser.parse_args()
-    init_worker(args.queue)
+    init_worker(args.queue, args.text_type, args.pdf_separator)
