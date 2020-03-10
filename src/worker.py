@@ -82,7 +82,8 @@ class Connector(object):
         self.logger.info(body_json.keys())
         if 'content' in body_json.keys():
             tokenized = Tokenized(body_json['content'])
-            body_json['tokenized'] = tokenized.clean_text()
+            body_json['tokenized'] = []
+            body_json['tokenized'].append(tokenized.clean_text())
             self.logger.info("inserting in mongo")
             self.db.insert_collection("default", body_json)
             self.logger.info(body)
