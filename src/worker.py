@@ -37,8 +37,7 @@ class Connector(object):
         )
         self._consumer = Consumer(self._amqp_url,
                                   queue,
-                                  getattr(self,
-                                          self.__callback_dicts__[text_type]))
+                                  self.__callback__)
         self.logger.info("Connected to rabbitmq: {}:{}".format(RABBITMQ_HOST,
                                                                RABBITMQ_PORT))
         db = Mongo(
@@ -47,6 +46,8 @@ class Connector(object):
                     MONGO_PORT
                 )
         self.db = db
+        self.mongo_collection = queue
+        self.mongo_collection_pdf = '{}_pdf'.format(queue)
         self.logger.info("Connected to mongo: {}:{}".format(MONGO_HOST,
                                                             MONGO_PORT))
 
@@ -76,22 +77,21 @@ class Connector(object):
             self._reconnect_delay = 30
         return self._reconnect_delay
 
-    def _callback_text(self, body):
+    def __callback__(self, body):
         self.logger.info("Tokenizing")
         body_json = json.loads(body.decode('utf8'))
         self.logger.info(body_json.keys())
+        getattr(self, self.__callback_dicts__[self.text_type])(body_json)
+
+    def _callback_text(self, body_json):
         if 'content' in body_json.keys():
             tokenized = Tokenized(body_json['content'])
             body_json['tokenized'] = []
             body_json['tokenized'].append(tokenized.clean_text())
             self.logger.info("inserting in mongo")
-            self.db.insert_collection("default", body_json)
-            self.logger.info(body)
+            self.db.insert_collection(self.mongo_collection, body_json)
 
-    def _callback_pdf(self, body):
-        self.logger.info("Tokenizing")
-        body_json = json.loads(body.decode('utf8'))
-        self.logger.info(body_json.keys())
+    def _callback_pdf(self, body_json):
         if 'file_path' in body_json.keys():
             content = subprocess.run(['pdftotext', body_json['file_path'], '-'],
                                      stdout=subprocess.PIPE)
@@ -104,8 +104,7 @@ class Connector(object):
                 tokenized = Tokenized(paragraph)
                 body_json['tokenized'].append(tokenized.clean_text())
             self.logger.info("inserting in mongo")
-            self.db.insert_collection("pdfs", body_json)
-            self.logger.info(body)
+            self.db.insert_collection(self.mongo_collection_pdf, body_json)
 
 
 def init_worker(queue, text_type, pdf_separator):
