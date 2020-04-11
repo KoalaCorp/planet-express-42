@@ -25,6 +25,8 @@ class Connector(object):
 
     def __init__(self, queue, text_type, pdf_separator):
         self.logger = logger
+        self.text_type = text_type
+        self.queue = queue
         self.pdf_separator = pdf_separator
         self.logger.info("Connecting to rabbitmq: {}:{}".format(RABBITMQ_HOST,
                                                                 RABBITMQ_PORT))
@@ -66,7 +68,9 @@ class Connector(object):
             reconnect_delay = self._get_reconnect_delay()
             self.logger.info('Reconnecting after %d seconds', reconnect_delay)
             sleep(reconnect_delay)
-            self._consumer = Consumer(self._amqp_url)
+            self._consumer = Consumer(self._amqp_url,
+                                      self.queue,
+                                      self.__callback__)
 
     def _get_reconnect_delay(self):
         if self._consumer.was_consuming:

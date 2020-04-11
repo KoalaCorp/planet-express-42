@@ -13,7 +13,8 @@ NORMS = [
     'remove_stop_words',
     'replace_punctuation',
     'remove_extra_whitespaces',
-    ('replace_characters', {'characters': ('“', '”'), 'replacement': ' '})]
+    ('replace_characters', {'characters': ('“', '”', '‘', '’'),
+                            'replacement': ' '})]
 tokenizer = data.load('tokenizers/punkt/spanish.pickle')
 
 
