@@ -7,7 +7,7 @@ services:
     ports:
       - "27017:27017"
     networks:
-      - planet-express_planet-express-network
+      - planet-express-network
   rabbitmq:
     image: rabbitmq
     container_name: rabbitmq
