@@ -31,7 +31,7 @@ class Connector(object):
         self.logger.info("Connecting to rabbitmq: {}:{}".format(RABBITMQ_HOST,
                                                                 RABBITMQ_PORT))
         self._reconnect_delay = 0
-        self._amqp_url = 'amqp://{}:{}@localhost:5672/'.format(
+        self._amqp_url = 'amqp://{}:{}@{}:{}/'.format(
             RABBITMQ_USER,
             RABBITMQ_PASSWORD,
             RABBITMQ_HOST,
