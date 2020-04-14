@@ -8,6 +8,19 @@ services:
       - "27017:27017"
     networks:
       - planet-express_planet-express-network
+  rabbitmq:
+    image: rabbitmq
+    container_name: rabbitmq
+    command: sh -c "rabbitmq-plugins enable rabbitmq_management; rabbitmq-server"
+    hostname: rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+      - "8080:8080"
+    networks:
+      - planet-express-network
+    volumes:
+      - ./deploy/rabbitmq-isolated.conf:/etc/rabbitmq/rabbitmq.config
 networks:
-  planet-express_planet-express-network:
-    external: true
+  planet-express-network:
+    driver: bridge
