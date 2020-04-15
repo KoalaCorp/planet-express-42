@@ -5,11 +5,11 @@ name: Python application
 
 on:
   push:
-    branches: 
+    branches:
     - master
     - development
   pull_request:
-    branches: 
+    branches:
     - master
     - development
 jobs:
@@ -37,4 +37,6 @@ jobs:
     - name: Test with uni
       run: |
         cd src
+        python -m nltk.downloader punkt
+        python -c "import nltk;nltk.download('averaged_perceptron_tagger')"
         python -m unittest tests/*_test.py
