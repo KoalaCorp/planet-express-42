@@ -37,6 +37,5 @@ jobs:
     - name: Test with uni
       run: |
         cd src
-        python -m nltk.downloader punkt
-        python -c "import nltk;nltk.download('averaged_perceptron_tagger')"
+        python -m spacy download es_core_news_md
         python -m unittest tests/*_test.py
