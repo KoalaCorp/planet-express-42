@@ -2,7 +2,7 @@ from collections import defaultdict
 
 import spacy
 
-from settings import SPACY_CORPUS, TOP_WORDS
+from settings import SPACY_CORPUS
 
 
 NLP = spacy.load(SPACY_CORPUS)
@@ -10,7 +10,8 @@ NLP = spacy.load(SPACY_CORPUS)
 
 class Tokenized(object):
 
-    words_to_avoid = ("DET", "ADP", "AUX", "CCONJ", "SCONJ", "NUM", "PART", "PRON", "SYM", "CONJ", "SPACE")
+    words_to_avoid = ("DET", "ADP", "AUX", "CCONJ", "SCONJ", "NUM", "PART",
+                      "PRON", "SYM", "CONJ", "SPACE")
 
     def __init__(self, text):
         self.text = text
@@ -20,6 +21,7 @@ class Tokenized(object):
 
         names = defaultdict(int)
         topics = defaultdict(int)
+        entities = defaultdict(lambda: {"score": 0, "entity": 0})
         for token in doc:
             word = token.text
             if token.is_stop != True and token.is_punct != True:
@@ -28,9 +30,17 @@ class Tokenized(object):
                 elif token.pos_ not in self.words_to_avoid:
                     topics[word] += 1
 
+        for ent in doc.ents:
+            word = ent.text
+            entities[word]["score"] += 1
+            entities[word]["entity"] = ent.label
+
         return {
-            'topics': [{"word": key, "score":topics[key]}
-                       for key in sorted(topics, key=topics.get, reverse=True)[:TOP_WORDS]],
-            'names': [{"word": key, "score":names[key]}
-                      for key in sorted(names, key=names.get, reverse=True)]
+            'topics': [{"word": key, "score": val}
+                       for key, val in topics.items()],
+            'names': [{"word": key, "score": val}
+                      for key, val in names.items()],
+            'entities': [{"word": key, "score": val["score"],
+                          "entity": val["entity"]}
+                         for key, val in entities.items()]
         }
