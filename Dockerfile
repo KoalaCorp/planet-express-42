@@ -7,5 +7,4 @@ ADD requirements.txt /worker/requirements.txt
 RUN pip install -r /worker/requirements.txt
 ADD src /worker
 
-RUN python -m nltk.downloader punkt
-RUN python -c "import nltk;nltk.download('averaged_perceptron_tagger')"
+RUN python -m spacy download es_core_news_md
